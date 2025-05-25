@@ -56,7 +56,7 @@ func Init() {
 
 // getClaudeAPIKey obtém a chave da API do Claude
 func getClaudeAPIKey() string {
-	// Prioridade: flag -> env var -> config file -> default
+	// Prioridade: flag -> env var -> config file
 	if key := viper.GetString("api-key"); key != "" {
 		return key
 	}
@@ -69,8 +69,8 @@ func getClaudeAPIKey() string {
 		return key
 	}
 	
-	// Se não encontrar em nenhum lugar, usar a key padrão fornecida pelo usuário
-	return "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"
+	// Retornar string vazia - usuário deve fornecer sua própria chave
+	return ""
 }
 
 // setDefaults define valores padrão para configurações
@@ -109,7 +109,19 @@ func setDefaults() {
 // ValidateConfig valida se a configuração está correta
 func ValidateConfig() error {
 	if GlobalConfig.Claude.APIKey == "" {
-		return fmt.Errorf("chave da API do Claude não configurada. Use --api-key ou defina CLAUDE_API_KEY")
+		return fmt.Errorf(`chave da API do Claude não configurada!
+
+Para usar as funcionalidades de IA, configure sua chave da Claude:
+
+💡 OPÇÕES DE CONFIGURAÇÃO:
+   1. Variável de ambiente: export CLAUDE_API_KEY="sua-chave-aqui"
+   2. Parâmetro da linha de comando: --api-key="sua-chave-aqui"
+   3. Arquivo de configuração ~/.lottery-optimizer.yaml
+
+🔑 OBTENHA SUA CHAVE:
+   Visite: https://console.anthropic.com/
+   
+⚠️  SEM CHAVE: O app funcionará apenas com estratégias básicas (sem IA)`)
 	}
 	
 	if GlobalConfig.App.DefaultBudget <= 0 {

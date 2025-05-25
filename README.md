@@ -47,7 +47,23 @@ go build -o lottery-optimizer .
 
 ## 🔑 Configuração da API
 
-Você precisa de uma chave da API do Claude. Configure de uma dessas formas:
+⚠️ **IMPORTANTE**: Para usar as funcionalidades de IA, você precisa da sua própria chave da Claude API.
+
+### 🆓 Sem Chave (Modo Básico)
+O app funciona sem chave da API, mas usa apenas estratégias básicas (sem IA):
+```bash
+./lottery-optimizer
+# ⚠️ Funciona com estratégias matemáticas simples
+```
+
+### 🤖 Com IA (Recomendado)
+Para análises avançadas com Claude AI, configure sua chave:
+
+**🔑 Obtenha sua chave gratuita:**
+1. Visite: [https://console.anthropic.com/](https://console.anthropic.com/)
+2. Crie uma conta gratuita
+3. Gere uma chave API
+4. Configure conforme abaixo
 
 ### Via Flag
 ```bash
