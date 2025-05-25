@@ -138,8 +138,6 @@ jobs:
         tags: |
           ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.version }}
           ghcr.io/${{ github.repository }}:latest
-          ${{ secrets.DOCKERHUB_USERNAME }}/lottery-optimizer:${{ steps.tag.outputs.version }}
-          ${{ secrets.DOCKERHUB_USERNAME }}/lottery-optimizer:latest
         platforms: linux/amd64,linux/arm64
         cache-from: type=gha
         cache-to: type=gha,mode=max
