@@ -1,0 +1,114 @@
+# =====================================================
+# 🎰 LOTTERY OPTIMIZER - CONFIGURAÇÃO EXEMPLO
+# =====================================================
+# 
+# Para usar este arquivo:
+# 1. Copie para: lottery-optimizer.yaml (mesmo diretório do executável)
+# 2. Configure sua chave da Claude API
+# 3. Ajuste as configurações conforme necessário
+#
+# =====================================================
+
+# =====================================================
+# 🤖 CONFIGURAÇÃO DA CLAUDE AI
+# =====================================================
+claude:
+  # 🔑 OBTENHA SUA CHAVE EM: https://console.anthropic.com/
+  # Descomente e configure sua chave:
+  # api_key: "sk-ant-api03-SUA_CHAVE_AQUI"
+  
+  # 🧠 Modelo mais avançado da Anthropic (recomendado)
+  model: "claude-3-5-sonnet-20241022"
+  
+  # 📝 Tokens máximos por resposta (4000 = bom equilíbrio)
+  max_tokens: 4000
+  
+  # ⏱️ Timeout de conexão em segundos
+  timeout_sec: 30
+
+# =====================================================
+# ⚙️ CONFIGURAÇÕES DA APLICAÇÃO
+# =====================================================
+app:
+  # 💾 Cache de resultados (recomendado para economia de API calls)
+  cache_enabled: true
+  
+  # ⏰ Duração do cache em horas (24h = 1 dia)
+  cache_duration_hours: 24
+  
+  # 💰 Orçamento padrão inicial em R$ (pode ser alterado na interface)
+  default_budget: 100
+  
+  # 📊 Nível de log (info, debug, error, warn)
+  log_level: "info"
+  
+  # 🌐 API oficial da CAIXA (não alterar)
+  data_source_url: "https://servicebus2.caixa.gov.br/portaldeloterias/api"
+
+# =====================================================
+# 🎯 CONFIGURAÇÕES AVANÇADAS (OPCIONAIS)
+# =====================================================
+
+# 📈 Configurações de performance da IA
+ai_performance:
+  # 🔄 Tentativas máximas em caso de erro
+  max_retries: 3
+  
+  # ⏱️ Intervalo entre tentativas (segundos)
+  retry_delay: 2
+  
+  # 🎯 Nível de confiança mínimo para aceitar sugestões (0.0 a 1.0)
+  min_confidence: 0.7
+
+# 🎲 Preferências padrão de estratégia
+strategy_defaults:
+  # 🛡️ Tipo: "conservative", "balanced", "aggressive"
+  type: "balanced"
+  
+  # 🎰 Loterias padrão: ["megasena", "lotofacil"] ou ["megasena"] ou ["lotofacil"]
+  preferred_lotteries: ["megasena", "lotofacil"]
+  
+  # 🔢 Evitar padrões óbvios (sequências, múltiplos)
+  avoid_patterns: true
+  
+  # 📊 Usar análise estatística histórica
+  use_historical_analysis: true
+
+# 🔧 Configurações de interface
+ui:
+  # 🎨 Usar cores na interface (true/false)
+  use_colors: true
+  
+  # 📏 Largura máxima da interface (caracteres)
+  max_width: 120
+  
+  # ⏱️ Timeout para input do usuário (segundos)
+  input_timeout: 300
+  
+  # 🔔 Mostrar mensagens de progresso
+  show_progress: true
+
+# =====================================================
+# 📋 INSTRUÇÕES DE USO
+# =====================================================
+#
+# 1. CONFIGURAÇÃO MÍNIMA:
+#    - Descomente e configure apenas 'claude.api_key'
+#    - Todas as outras configurações são opcionais
+#
+# 2. CONFIGURAÇÃO RECOMENDADA:
+#    - Configure claude.api_key
+#    - Ajuste app.default_budget para seu orçamento preferido
+#    - Mantenha cache_enabled: true para economizar API calls
+#
+# 3. CONFIGURAÇÃO AVANÇADA:
+#    - Ajuste ai_performance.min_confidence para ser mais/menos rigoroso
+#    - Modifique strategy_defaults conforme suas preferências
+#    - Personalize ui.* para sua experiência preferida
+#
+# 4. LOCALIZAÇÃO DO ARQUIVO:
+#    - Primeira opção: ./lottery-optimizer.yaml (mesmo diretório do executável)
+#    - Segunda opção: $HOME/.lottery-optimizer.yaml (diretório home)
+#    - Personalizada: --config /caminho/para/arquivo.yaml
+#
+# ===================================================== 

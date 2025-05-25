@@ -41,7 +41,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Flags globais
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "arquivo de configuração (padrão: $HOME/.lottery-optimizer.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "arquivo de configuração (padrão: ./lottery-optimizer.yaml ou $HOME/.lottery-optimizer.yaml)")
 	rootCmd.PersistentFlags().Bool("verbose", false, "saída detalhada")
 	rootCmd.PersistentFlags().String("api-key", "", "chave da API do Claude (também pode ser definida via CLAUDE_API_KEY)")
 
@@ -55,12 +55,17 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
+		// Primeiro: procurar no diretório atual (onde está o executável)
+		viper.AddConfigPath(".")
+		
+		// Segundo: procurar no diretório home (fallback)
 		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+		if err == nil {
+			viper.AddConfigPath(home)
+		}
 
-		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".lottery-optimizer")
+		viper.SetConfigName("lottery-optimizer") // sem ponto, mais limpo
 	}
 
 	viper.AutomaticEnv()

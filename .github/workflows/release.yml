@@ -1,4 +1,4 @@
-name: 🚀 Release
+name: Release
 
 on:
   push:
@@ -13,71 +13,65 @@ env:
   GO_VERSION: '1.22'
 
 jobs:
-  # =====================================================
-  # 🧪 PRE-RELEASE VALIDATION
-  # =====================================================
   validate:
-    name: 🧪 Pre-Release Validation
+    name: Pre-Release Validation
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
-    - name: 🔧 Setup Go ${{ env.GO_VERSION }}
+    - name: Setup Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: 📥 Download Dependencies
+    - name: Download Dependencies
       run: go mod download
       
-    - name: 🧪 Run Tests
+    - name: Run Tests
       run: go test -v ./...
       
-    - name: 🏗️ Test Build
+    - name: Test Build
       run: go build .
       
-    - name: ✅ Validation Complete
-      run: echo "🎉 All pre-release validations passed!"
+    - name: Validation Complete
+      run: echo "All pre-release validations passed!"
 
-  # =====================================================
-  # 📦 GORELEASER BUILD & RELEASE
-  # =====================================================
   release:
-    name: 📦 GoReleaser
+    name: GoReleaser
     needs: validate
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
-    - name: 🔧 Setup Go ${{ env.GO_VERSION }}
+    - name: Setup Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: 🏷️ Get Tag Info
+    - name: Get Tag Info
       id: tag
       run: |
         echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
         
-    - name: 🔍 Validate Tag Format
+    - name: Validate Tag Format
       run: |
         if [[ ! "${{ steps.tag.outputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-          echo "❌ Invalid tag format: ${{ steps.tag.outputs.tag }}"
+          echo "Invalid tag format: ${{ steps.tag.outputs.tag }}"
           echo "Expected format: v1.2.3 or v1.2.3-beta"
           exit 1
         fi
-        echo "✅ Valid tag format: ${{ steps.tag.outputs.tag }}"
+        echo "Valid tag format: ${{ steps.tag.outputs.tag }}"
         
-    - name: 📦 Run GoReleaser
+    - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v5
       with:
         distribution: goreleaser
@@ -86,30 +80,27 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: 📊 Release Summary
+    - name: Release Summary
       run: |
-        echo "🎉 Release ${{ steps.tag.outputs.tag }} completed successfully!"
-        echo "📦 Binaries built for multiple platforms"
-        echo "📝 Release notes generated"
-        echo "🔗 Available at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag }}"
+        echo "Release ${{ steps.tag.outputs.tag }} completed successfully!"
+        echo "Binaries built for multiple platforms"
+        echo "Release notes generated"
+        echo "Available at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag }}"
 
-  # =====================================================
-  # 📢 SIMPLE SUCCESS MESSAGE
-  # =====================================================
   notify:
-    name: 📢 Release Complete
+    name: Release Complete
     needs: [release]
     runs-on: ubuntu-latest
     if: success()
     
     steps:
-    - name: 🏷️ Get Tag Info
+    - name: Get Tag Info
       id: tag
       run: |
         echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
         
-    - name: ✅ Success Message
+    - name: Success Message
       run: |
         echo "Release ${{ steps.tag.outputs.tag }} completed successfully!"
         echo "Download: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag }}" 

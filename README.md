@@ -47,40 +47,34 @@ go build -o lottery-optimizer .
 
 ## 🔑 Configuração da API
 
-⚠️ **IMPORTANTE**: Para usar as funcionalidades de IA, você precisa da sua própria chave da Claude API.
+**IMPORTANTE**: Este software agora funciona em **MODO SEGURO**. Você deve configurar sua própria chave da Claude API.
 
-### 🆓 Sem Chave (Modo Básico)
-O app funciona sem chave da API, mas usa apenas estratégias básicas (sem IA):
+#### **Opção 1: Arquivo de Configuração (Recomendado)**
+
+O programa procura configuração na seguinte ordem:
+1. `./lottery-optimizer.yaml` (mesmo diretório do executável)
+2. `$HOME/.lottery-optimizer.yaml` (diretório home)
+
+**Exemplo incluído**: Ao baixar o release, você recebe um arquivo `lottery-optimizer.yaml.example` com todas as configurações otimizadas. Basta:
+
 ```bash
-./lottery-optimizer
-# ⚠️ Funciona com estratégias matemáticas simples
+# Copie o exemplo
+cp lottery-optimizer.yaml.example lottery-optimizer.yaml
+
+# Edite e adicione sua chave
+nano lottery-optimizer.yaml  # ou seu editor preferido
 ```
 
-### 🤖 Com IA (Recomendado)
-Para análises avançadas com Claude AI, configure sua chave:
-
-**🔑 Obtenha sua chave gratuita:**
-1. Visite: [https://console.anthropic.com/](https://console.anthropic.com/)
-2. Crie uma conta gratuita
-3. Gere uma chave API
-4. Configure conforme abaixo
-
-### Via Flag
-```bash
-./lottery-optimizer --api-key="sua-chave-aqui"
-```
-
-### Via Variável de Ambiente
-```bash
-export CLAUDE_API_KEY="sua-chave-aqui"
-./lottery-optimizer
-```
-
-### Via Arquivo de Configuração
-Crie `~/.lottery-optimizer.yaml`:
+**Configuração mínima**:
 ```yaml
 claude:
-  api_key: "sua-chave-aqui"
+  api_key: "sk-ant-api03-SUA_CHAVE_AQUI"
+```
+
+**Configuração completa otimizada**:
+```yaml
+claude:
+  api_key: "sk-ant-api03-SUA_CHAVE_AQUI"
   model: "claude-3-5-sonnet-20241022"
   max_tokens: 4000
   timeout_sec: 30
@@ -88,9 +82,29 @@ claude:
 app:
   cache_enabled: true
   cache_duration_hours: 24
-  default_budget: 50
+  default_budget: 100
   log_level: "info"
 ```
+
+#### **Opção 2: Variável de Ambiente**
+```bash
+export CLAUDE_API_KEY="sk-ant-api03-SUA_CHAVE_AQUI"
+./lottery-optimizer
+```
+
+#### **Opção 3: Parâmetro de Linha de Comando**
+```bash
+./lottery-optimizer --api-key="sk-ant-api03-SUA_CHAVE_AQUI"
+```
+
+#### **🔑 Onde Obter sua Chave API**
+1. Acesse: https://console.anthropic.com/
+2. Faça login ou crie uma conta
+3. Vá em "API Keys"
+4. Clique em "Create Key"
+5. Copie sua chave (formato: `sk-ant-api03-...`)
+
+**Sem chave API?** O programa ainda funciona com estratégias matemáticas básicas!
 
 ## 🎮 Como Usar
 
