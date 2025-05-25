@@ -1,9 +1,109 @@
 package lottery
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
+
+// BrazilianDate tipo customizado para dates no formato brasileiro DD/MM/YYYY
+type BrazilianDate time.Time
+
+// UnmarshalJSON implementa json.Unmarshaler para BrazilianDate
+func (bd *BrazilianDate) UnmarshalJSON(data []byte) error {
+	// Remove aspas da string JSON
+	s := strings.Trim(string(data), `"`)
+	
+	if s == "null" || s == "" {
+		return nil
+	}
+	
+	// Tenta diferentes formatos de data brasileira
+	formats := []string{
+		"02/01/2006",
+		"2/1/2006",
+		"02/01/06",
+		"2/1/06",
+		"02-01-2006",
+		"2006-01-02", // ISO como fallback
+	}
+	
+	for _, format := range formats {
+		if t, err := time.Parse(format, s); err == nil {
+			*bd = BrazilianDate(t)
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("não foi possível fazer parse da data: %s", s)
+}
+
+// MarshalJSON implementa json.Marshaler para BrazilianDate
+func (bd BrazilianDate) MarshalJSON() ([]byte, error) {
+	if time.Time(bd).IsZero() {
+		return []byte("null"), nil
+	}
+	return []byte(`"` + time.Time(bd).Format("02/01/2006") + `"`), nil
+}
+
+// Time converte BrazilianDate para time.Time
+func (bd BrazilianDate) Time() time.Time {
+	return time.Time(bd)
+}
+
+// String implementa fmt.Stringer
+func (bd BrazilianDate) String() string {
+	return time.Time(bd).Format("02/01/2006")
+}
+
+// StringIntSlice tipo customizado para arrays que vêm como strings mas precisam ser integers
+type StringIntSlice []int
+
+// UnmarshalJSON implementa json.Unmarshaler para StringIntSlice
+func (sis *StringIntSlice) UnmarshalJSON(data []byte) error {
+	var stringSlice []string
+	if err := json.Unmarshal(data, &stringSlice); err != nil {
+		// Se não conseguir como array de strings, tenta como array de ints direto
+		var intSlice []int
+		if err2 := json.Unmarshal(data, &intSlice); err2 != nil {
+			return fmt.Errorf("não foi possível fazer parse dos números: %v (como strings) ou %v (como ints)", err, err2)
+		}
+		*sis = StringIntSlice(intSlice)
+		return nil
+	}
+	
+	// Converter strings para integers
+	var result []int
+	for _, s := range stringSlice {
+		// Remove zeros à esquerda e espaços
+		s = strings.TrimSpace(s)
+		s = strings.TrimLeft(s, "0")
+		if s == "" {
+			s = "0"
+		}
+		
+		num, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("não foi possível converter '%s' para número: %v", s, err)
+		}
+		result = append(result, num)
+	}
+	
+	*sis = StringIntSlice(result)
+	return nil
+}
+
+// MarshalJSON implementa json.Marshaler para StringIntSlice
+func (sis StringIntSlice) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]int(sis))
+}
+
+// ToIntSlice converte para []int
+func (sis StringIntSlice) ToIntSlice() []int {
+	return []int(sis)
+}
 
 // LotteryType tipos de loteria suportados
 type LotteryType string
@@ -54,14 +154,14 @@ func GetRules(ltype LotteryType) LotteryRules {
 
 // Draw representa um sorteio individual
 type Draw struct {
-	Number         int       `json:"numero"`
-	Date           time.Time `json:"dataApuracao"`
-	Numbers        []int     `json:"dezenasSorteadasOrdemSorteio"`
-	Winners        []Winner  `json:"listaRateioPremio"`
-	PrizeTotal     float64   `json:"valorArrecadado"`
-	NextDrawNumber int       `json:"numeroConcursoProximo"`
-	NextDrawDate   time.Time `json:"dataProximoConcurso"`
-	Accumulated    bool      `json:"acumulado"`
+	Number         int             `json:"numero"`
+	Date           BrazilianDate   `json:"dataApuracao"`
+	Numbers        StringIntSlice  `json:"dezenasSorteadasOrdemSorteio"`
+	Winners        []Winner        `json:"listaRateioPremio"`
+	PrizeTotal     float64         `json:"valorArrecadado"`
+	NextDrawNumber int             `json:"numeroConcursoProximo"`
+	NextDrawDate   BrazilianDate   `json:"dataProximoConcurso"`
+	Accumulated    bool            `json:"acumulado"`
 }
 
 // Winner representa ganhadores por faixa de prêmio

@@ -166,5 +166,6 @@ func (c *Client) GetNextDrawInfo(ltype lottery.LotteryType) (*time.Time, int, er
 		return nil, 0, fmt.Errorf("nenhum sorteio encontrado")
 	}
 	
-	return &latest[0].NextDrawDate, latest[0].NextDrawNumber, nil
+	nextDate := latest[0].NextDrawDate.Time()
+	return &nextDate, latest[0].NextDrawNumber, nil
 } 
