@@ -83,18 +83,34 @@ func (c *ClaudeClient) AnalyzeStrategy(request lottery.AnalysisRequest) (*lotter
 		return nil, fmt.Errorf("erro ao serializar requisição: %w", err)
 	}
 	
-	req, err := http.NewRequest("POST", c.baseURL, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("erro ao criar requisição: %w", err)
-	}
+	// Implementar retry logic com exponential backoff
+	var resp *http.Response
+	maxRetries := 3
+	baseDelay := 2 * time.Second
 	
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", c.apiKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-	
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("erro na requisição: %w", err)
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		req, err := http.NewRequest("POST", c.baseURL, bytes.NewBuffer(reqBody))
+		if err != nil {
+			return nil, fmt.Errorf("erro ao criar requisição: %w", err)
+		}
+		
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-api-key", c.apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<attempt) // Exponential backoff
+				if config.IsVerbose() {
+					fmt.Printf("⚠️  Tentativa %d falhou, tentando novamente em %v...\n", attempt+1, delay)
+				}
+				time.Sleep(delay)
+				continue
+			}
+			return nil, fmt.Errorf("erro na requisição após %d tentativas: %w", maxRetries, err)
+		}
+		break
 	}
 	defer resp.Body.Close()
 	
@@ -135,85 +151,43 @@ func (c *ClaudeClient) AnalyzeStrategy(request lottery.AnalysisRequest) (*lotter
 
 // buildAnalysisPrompt constrói o prompt para análise
 func (c *ClaudeClient) buildAnalysisPrompt(request lottery.AnalysisRequest) string {
-	// Serializar dados históricos
+	// Serializar apenas os dados essenciais
 	drawsJSON, _ := json.MarshalIndent(request.Draws, "", "  ")
 	prefsJSON, _ := json.MarshalIndent(request.Preferences, "", "  ")
 	rulesJSON, _ := json.MarshalIndent(request.Rules, "", "  ")
 	
-	prompt := fmt.Sprintf(`Você é um especialista em análise estatística de loterias brasileiras com PhD em Matemática e anos de experiência em análise de dados.
+	prompt := fmt.Sprintf(`Você é um especialista em análise estatística de loterias brasileiras.
 
-MISSÃO: Analisar os dados históricos fornecidos e criar a estratégia MAIS OTIMIZADA possível para maximizar as chances de ganhar na Mega Sena e/ou Lotofácil.
+MISSÃO: Analisar dados históricos e criar estratégia otimizada para maximizar chances de ganhar.
 
-DADOS HISTÓRICOS:
+DADOS HISTÓRICOS (%d sorteios):
 %s
 
-PREFERÊNCIAS DO USUÁRIO:
+PREFERÊNCIAS:
 %s
 
-REGRAS DAS LOTERIAS:
+REGRAS:
 %s
 
-INSTRUÇÕES ESPECÍFICAS:
-1. 🎯 ANÁLISE ESTATÍSTICA PROFUNDA:
-   - Calcule frequências de cada número nos últimos sorteios
-   - Identifique padrões temporais e tendências
-   - Analise distribuição de somas e padrões de espaçamento
-   - Detecte números "quentes" (mais sorteados) e "frios" (menos sorteados)
-   - Analise correlações entre números
-
-2. 🧠 ESTRATÉGIAS AVANÇADAS:
-   - Use teoria de probabilidades para otimizar seleção
-   - Evite padrões óbvios (sequências, múltiplos, etc.)
-   - Distribua números de forma equilibrada pelo range
-   - Considere estratégias de cobertura máxima
-   - Otimize para o orçamento disponível
-
-3. 💰 OTIMIZAÇÃO DE ORÇAMENTO:
-   - Distribua o orçamento de forma inteligente entre os jogos
-   - Priorize jogos com melhor custo-benefício
-   - Considere jogos com mais números para aumentar chances
-   - Balance entre quantidade de jogos e cobertura
-
-4. 📊 RESPOSTA OBRIGATÓRIA EM JSON:
+INSTRUÇÕES:
+1. 🎯 ANÁLISE: Calcule frequências, identifique padrões, números quentes/frios
+2. 🧠 ESTRATÉGIA: Use probabilidade, evite padrões óbvios, distribua números
+3. 💰 ORÇAMENTO: Otimize distribuição, respeite limite exato
+4. 📊 RESPOSTA EM JSON:
 {
   "strategy": {
-    "games": [
-      {
-        "type": "megasena",
-        "numbers": [1, 2, 3, 4, 5, 6],
-        "cost": 5.0,
-        "expectedReturn": 0.0001,
-        "probability": 0.000002
-      }
-    ],
+    "games": [{"type": "megasena", "numbers": [1,2,3,4,5,6], "cost": 5.0, "probability": 0.000002}],
     "totalCost": 50.0,
     "budget": 50.0,
-    "expectedReturn": 0.001,
-    "reasoning": "Explicação detalhada da estratégia...",
-    "statistics": {
-      "totalDraws": 2000,
-      "analyzedDraws": 100,
-      "numberFrequency": {},
-      "hotNumbers": [7, 10, 23],
-      "coldNumbers": [13, 32, 55],
-      "patterns": {}
-    },
+    "reasoning": "Explicação da estratégia...",
+    "statistics": {"totalDraws": %d, "hotNumbers": [], "coldNumbers": []},
     "createdAt": "2025-01-27T10:00:00Z"
   },
-  "confidence": 0.85,
-  "alternatives": [],
-  "warnings": []
+  "confidence": 0.85
 }
 
-5. ⚡ REQUIREMENTS CRÍTICOS:
-   - SEMPRE retorne JSON válido
-   - Gere jogos ÚNICOS (sem repetição)
-   - Respeite o orçamento EXATAMENTE
-   - Números válidos para cada loteria
-   - Justifique CADA decisão estatisticamente
-   - Seja AGRESSIVO na otimização - o objetivo é GANHAR!
-
-🎲 AGORA ANALISE E CRIE A ESTRATÉGIA MAIS FODA POSSÍVEL!`, drawsJSON, prefsJSON, rulesJSON)
+REQUIREMENTS: JSON válido, jogos únicos, orçamento exato, números válidos, justificativa estatística.`, 
+		len(request.Draws), drawsJSON, prefsJSON, rulesJSON, len(request.Draws))
 
 	return prompt
 }

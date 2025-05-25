@@ -1,0 +1,5 @@
+claude:
+  timeout_sec: 60
+app:
+  default_budget: 100
+  cache_enabled: true 

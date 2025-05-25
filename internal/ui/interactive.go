@@ -123,7 +123,7 @@ func generateStrategy() {
 	var allRules []lottery.LotteryRules
 	
 	for _, ltype := range prefs.LotteryTypes {
-		draws, err := dataClient.GetLatestDraws(ltype, 200) // Últimos 200 sorteios
+		draws, err := dataClient.GetLatestDraws(ltype, 50) // Reduzido de 200 para 50 sorteios
 		if err != nil {
 			color.Red("❌ Erro ao buscar dados de %s: %v", ltype, err)
 			continue
