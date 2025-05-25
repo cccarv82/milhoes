@@ -1,0 +1,327 @@
+version: 2
+
+project_name: lottery-optimizer
+
+# =====================================================
+# 📋 METADATA
+# =====================================================
+metadata:
+  mod_timestamp: '{{ .CommitTimestamp }}'
+
+# =====================================================
+# 🏗️ BUILD CONFIGURATION
+# =====================================================
+builds:
+  - id: lottery-optimizer
+    binary: lottery-optimizer
+    
+    # Build targets
+    goos:
+      - linux
+      - windows
+      - darwin
+    
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+    
+    # Skip combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: "386"
+    
+    # Build flags
+    flags:
+      - -trimpath
+    
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+    
+    env:
+      - CGO_ENABLED=0
+    
+    # Main package
+    main: .
+    
+    # Binary name for Windows
+    hooks:
+      post:
+        - cmd: echo "✅ Binary built for {{ .Os }}/{{ .Arch }}"
+
+# =====================================================
+# 📦 ARCHIVES
+# =====================================================
+archives:
+  - id: lottery-optimizer
+    builds:
+      - lottery-optimizer
+    
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    
+    format_overrides:
+      - goos: windows
+        format: zip
+    
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+    
+    # Archive contents
+    wrap_in_directory: false
+
+# =====================================================
+# 🐳 DOCKER IMAGES
+# =====================================================
+dockers:
+  - image_templates:
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}"
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:latest"
+    
+    dockerfile: Dockerfile
+    
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.description=AI-powered lottery strategy optimizer for Brazilian lotteries
+      - --label=org.opencontainers.image.url=https://github.com/{{.Env.GITHUB_REPOSITORY}}
+      - --label=org.opencontainers.image.source=https://github.com/{{.Env.GITHUB_REPOSITORY}}
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.licenses=MIT
+    
+    extra_files:
+      - README.md
+      - LICENSE
+
+# ARM64 Docker images
+  - image_templates:
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}-arm64"
+    
+    dockerfile: Dockerfile
+    
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.description=AI-powered lottery strategy optimizer for Brazilian lotteries
+      - --label=org.opencontainers.image.url=https://github.com/{{.Env.GITHUB_REPOSITORY}}
+      - --label=org.opencontainers.image.source=https://github.com/{{.Env.GITHUB_REPOSITORY}}
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.licenses=MIT
+    
+    goarch: arm64
+    
+    extra_files:
+      - README.md
+      - LICENSE
+
+# =====================================================
+# 🏷️ DOCKER MANIFESTS
+# =====================================================
+docker_manifests:
+  - name_template: "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}"
+    image_templates:
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}"
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}-arm64"
+  
+  - name_template: "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:latest"
+    image_templates:
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}"
+      - "ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Version}}-arm64"
+
+# =====================================================
+# 🔐 CHECKSUMS
+# =====================================================
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+# =====================================================
+# 📝 CHANGELOG
+# =====================================================
+changelog:
+  sort: asc
+  use: github
+  
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^build:'
+      - '^style:'
+      - '^refactor:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+  
+  groups:
+    - title: '🚀 Features'
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    
+    - title: '🐛 Bug Fixes'
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    
+    - title: '🔐 Security'
+      regexp: '^.*?sec(\(.+\))??!?:.+$'
+      order: 2
+    
+    - title: '📈 Performance'
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 3
+    
+    - title: '🔧 Maintenance'
+      regexp: '^.*?chore(\(.+\))??!?:.+$'
+      order: 4
+    
+    - title: Others
+      order: 999
+
+# =====================================================
+# 📋 RELEASE NOTES
+# =====================================================
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: lottery-optimizer
+  
+  name_template: "🎰 Lottery Optimizer {{.Tag}}"
+  
+  header: |
+    ## 🎰 Lottery Optimizer {{.Tag}}
+    
+    **AI-Powered Brazilian Lottery Strategy Optimizer**
+    
+    Using Claude Sonnet 4 for advanced statistical analysis and strategy optimization.
+  
+  footer: |
+    ---
+    
+    ### 🚀 Quick Start
+    
+    ```bash
+    # Linux/macOS
+    curl -L https://github.com/{{.Env.GITHUB_REPOSITORY}}/releases/download/{{.Tag}}/lottery-optimizer_{{.Version}}_{{.Os}}_{{.Arch}}.tar.gz | tar xz
+    
+    # Windows
+    # Download lottery-optimizer_{{.Version}}_windows_amd64.zip and extract
+    ```
+    
+    ### 🔑 Setup
+    
+    ```bash
+    export CLAUDE_API_KEY="your-api-key-here"
+    ./lottery-optimizer
+    ```
+    
+    ### 🐳 Docker
+    
+    ```bash
+    docker run -e CLAUDE_API_KEY="your-api-key" ghcr.io/{{.Env.GITHUB_REPOSITORY_OWNER}}/lottery-optimizer:{{.Tag}}
+    ```
+    
+    ---
+    
+    **🍀 Que a sorte esteja com você! 🍀**
+    
+    *Desenvolvido com ❤️ e muita matemática 📊*
+  
+  # Draft release
+  draft: false
+  
+  # Prerelease detection
+  prerelease: auto
+  
+  # Release mode
+  mode: replace
+  
+  # Skip if no changes
+  skip_upload: false
+
+# =====================================================
+# 📊 SOURCE ARCHIVE
+# =====================================================
+source:
+  enabled: true
+  name_template: '{{ .ProjectName }}-{{ .Version }}-source'
+  format: 'tar.gz'
+
+# =====================================================
+# 🏆 SNAPSHOTS
+# =====================================================
+snapshot:
+  name_template: '{{ .Version }}-next'
+
+# =====================================================
+# 📈 GIT CONFIGURATION
+# =====================================================
+git:
+  # What should be used to sort tags when gathering the current and previous
+  # tags if there are more than one tag in the same commit.
+  tag_sort: -version:refname
+
+# =====================================================
+# 🎯 UNIVERSAL BINARIES (macOS)
+# =====================================================
+universal_binaries:
+  - id: lottery-optimizer-universal
+    name_template: lottery-optimizer
+    replace: true
+
+# =====================================================
+# 🍺 HOMEBREW TAP (Future Enhancement)
+# =====================================================
+# Uncomment when you have a Homebrew tap repository
+# brews:
+#   - repository:
+#       owner: your-username
+#       name: homebrew-tap
+#     folder: Formula
+#     homepage: https://github.com/your-username/lottery-optimizer
+#     description: "AI-powered lottery strategy optimizer for Brazilian lotteries"
+#     license: MIT
+#     skip_upload: auto
+#     test: |
+#       system "#{bin}/lottery-optimizer --help"
+
+# =====================================================
+# 📦 NFPM (Linux Packages) - Future Enhancement
+# =====================================================
+# Uncomment to generate .deb and .rpm packages
+# nfpms:
+#   - id: lottery-optimizer
+#     package_name: lottery-optimizer
+#     file_name_template: '{{ .ConventionalFileName }}'
+#     vendor: Your Name
+#     homepage: https://github.com/your-username/lottery-optimizer
+#     maintainer: Your Name <your.email@example.com>
+#     description: AI-powered lottery strategy optimizer for Brazilian lotteries
+#     license: MIT
+#     formats:
+#       - deb
+#       - rpm
+#     bindir: /usr/bin
+
+# =====================================================
+# 🚀 ANNOUNCE (Future Enhancement)
+# =====================================================
+# Uncomment to enable announcements
+# announce:
+#   slack:
+#     enabled: true
+#     message_template: 'New release: {{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+#   discord:
+#     enabled: true
+#     message_template: '🎉 {{ .ProjectName }} {{ .Tag }} released! Download: {{ .ReleaseURL }}' 
