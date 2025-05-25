@@ -99,6 +99,7 @@ func showMainMenu() string {
 func generateStrategy() {
 	cyan := color.New(color.FgCyan, color.Bold)
 	yellow := color.New(color.FgYellow)
+	red := color.New(color.FgRed)
 	
 	cyan.Println("\n🎯 GERAÇÃO DE ESTRATÉGIA OTIMIZADA")
 	fmt.Println("═══════════════════════════════════════")
@@ -116,31 +117,73 @@ func generateStrategy() {
 	dataClient := data.NewClient()
 	aiClient := ai.NewClaudeClient()
 	
-	// Buscar dados históricos
+	// Buscar dados históricos com lógica de fallback
 	yellow.Println("📥 Buscando dados históricos...")
 	
 	var allDraws []lottery.Draw
 	var allRules []lottery.LotteryRules
+	var availableLotteries []lottery.LotteryType
+	var failedLotteries []lottery.LotteryType
 	
 	for _, ltype := range prefs.LotteryTypes {
-		draws, err := dataClient.GetLatestDraws(ltype, 50) // Reduzido de 200 para 50 sorteios
+		draws, err := dataClient.GetLatestDraws(ltype, 50)
 		if err != nil {
-			color.Red("❌ Erro ao buscar dados de %s: %v", ltype, err)
+			red.Printf("❌ %s: %v\n", ltype, err)
+			failedLotteries = append(failedLotteries, ltype)
 			continue
 		}
 		
 		allDraws = append(allDraws, draws...)
 		allRules = append(allRules, lottery.GetRules(ltype))
+		availableLotteries = append(availableLotteries, ltype)
 		
 		if config.IsVerbose() {
 			fmt.Printf("✅ Obtidos %d sorteios de %s\n", len(draws), ltype)
 		}
 	}
 	
-	if len(allDraws) == 0 {
-		color.Red("❌ Nenhum dado histórico encontrado!")
+	// Implementar lógica de fallback conforme especificação do usuário
+	if len(availableLotteries) == 0 {
+		// Nenhuma loteria disponível
+		red.Println("\n❌ DADOS INDISPONÍVEIS")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Println("🚫 Não foi possível obter dados de nenhuma loteria.")
+		fmt.Println("📡 A API da CAIXA está indisponível")
+		fmt.Println("📋 Cache não encontrado ou expirado (mais de 1 mês)")
+		fmt.Println()
+		fmt.Println("💡 SOLUÇÕES:")
+		fmt.Println("• Tente novamente em alguns minutos")
+		fmt.Println("• Verifique sua conexão com a internet")
+		fmt.Println("• A API da CAIXA pode estar em manutenção")
+		fmt.Println()
 		return
 	}
+	
+	if len(prefs.LotteryTypes) == 1 && len(failedLotteries) > 0 {
+		// Usuário escolheu apenas uma loteria e ela falhou
+		red.Printf("\n❌ LOTERIA INDISPONÍVEL: %s\n", failedLotteries[0])
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("🚫 Não foi possível obter dados de %s\n", failedLotteries[0])
+		fmt.Println("📡 A API da CAIXA está indisponível para esta loteria")
+		fmt.Println("📋 Cache não encontrado ou expirado (mais de 1 mês)")
+		fmt.Println()
+		fmt.Println("💡 SUGESTÕES:")
+		fmt.Println("• Tente novamente mais tarde")
+		fmt.Println("• Considere incluir ambas as loterias (Mega Sena + Lotofácil)")
+		fmt.Println("• Verifique se a API da CAIXA está funcionando")
+		fmt.Println()
+		return
+	}
+	
+	if len(failedLotteries) > 0 && len(availableLotteries) > 0 {
+		// Algumas loterias falharam, outras funcionaram
+		yellow.Printf("\n⚠️  Usando apenas: %v\n", availableLotteries)
+		fmt.Printf("❌ Indisponível: %v\n", failedLotteries)
+		fmt.Println()
+	}
+	
+	// Atualizar preferências para usar apenas loterias disponíveis
+	prefs.LotteryTypes = availableLotteries
 	
 	// Preparar requisição para IA
 	analysisReq := lottery.AnalysisRequest{
@@ -314,12 +357,15 @@ func displayStrategy(strategy *lottery.Strategy, confidence float64) {
 		fmt.Println()
 	}
 	
-	// Exibir raciocínio da IA
+	// Exibir raciocínio da IA - LIMPO e SEM JSON
 	cyan.Println("🤖 JUSTIFICATIVA DA IA:")
-	fmt.Println(strategy.Reasoning)
+	
+	// Limpar o reasoning removendo JSON e informações duplicadas
+	cleanReasoning := cleanAIReasoning(strategy.Reasoning)
+	fmt.Println(cleanReasoning)
 	fmt.Println()
 	
-	// Estatísticas
+	// Estatísticas - RESUMIDAS
 	if strategy.Statistics.TotalDraws > 0 {
 		cyan.Println("📊 ESTATÍSTICAS:")
 		fmt.Printf("• Sorteios analisados: %d\n", strategy.Statistics.AnalyzedDraws)
@@ -354,6 +400,85 @@ func displayStrategy(strategy *lottery.Strategy, confidence float64) {
 	fmt.Println(strings.Repeat("═", 60))
 	green.Println("🍀 BOA SORTE! 🍀")
 	fmt.Println(strings.Repeat("═", 60))
+}
+
+// cleanAIReasoning limpa e formata o raciocínio da IA
+func cleanAIReasoning(reasoning string) string {
+	if reasoning == "" {
+		return "Estratégia baseada em análise estatística dos dados históricos."
+	}
+	
+	// Remover JSON blocks
+	lines := strings.Split(reasoning, "\n")
+	cleanLines := []string{}
+	skipJSON := false
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// Detectar início de JSON
+		if strings.Contains(line, "{") && (strings.Contains(line, "strategy") || strings.Contains(line, "games")) {
+			skipJSON = true
+			continue
+		}
+		
+		// Detectar fim de JSON
+		if skipJSON && strings.Contains(line, "}") {
+			skipJSON = false
+			continue
+		}
+		
+		// Pular linhas dentro do JSON
+		if skipJSON {
+			continue
+		}
+		
+		// Pular linhas vazias ou com apenas símbolos
+		if line == "" || strings.Trim(line, "{}[],\"") == "" {
+			continue
+		}
+		
+		// Pular linhas que são claramente JSON
+		if strings.HasPrefix(line, "\"") || strings.HasPrefix(line, "{") || strings.HasPrefix(line, "}") {
+			continue
+		}
+		
+		// Pular dados técnicos duplicados
+		if strings.Contains(line, "\"type\":") || strings.Contains(line, "\"numbers\":") || 
+		   strings.Contains(line, "\"cost\":") || strings.Contains(line, "\"probability\":") {
+			continue
+		}
+		
+		// Limpar prefixos numerados desnecessários
+		if strings.HasPrefix(line, "1.") || strings.HasPrefix(line, "2.") || 
+		   strings.HasPrefix(line, "3.") || strings.HasPrefix(line, "4.") || 
+		   strings.HasPrefix(line, "5.") {
+			line = strings.TrimSpace(line[2:])
+		}
+		
+		// Manter apenas linhas com conteúdo útil
+		if len(line) > 10 && !strings.Contains(line, "createdAt") && !strings.Contains(line, "confidence") {
+			cleanLines = append(cleanLines, line)
+		}
+	}
+	
+	// Se não sobrou nada útil, usar texto padrão
+	if len(cleanLines) == 0 {
+		return "Estratégia baseada em análise estatística avançada dos dados históricos, considerando frequência de números, padrões temporais e otimização do orçamento disponível."
+	}
+	
+	// Juntar e limitar tamanho
+	result := strings.Join(cleanLines, "\n")
+	
+	// Limitar tamanho para não poluir a tela
+	if len(result) > 500 {
+		words := strings.Fields(result)
+		if len(words) > 60 {
+			result = strings.Join(words[:60], " ") + "..."
+		}
+	}
+	
+	return result
 }
 
 // Funções auxiliares

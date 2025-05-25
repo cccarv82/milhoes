@@ -12,14 +12,15 @@ import (
 
 // Client cliente para APIs de loterias
 type Client struct {
-	client *resty.Client
-	baseURL string
+	client       *resty.Client
+	baseURL      string
+	cacheManager *CacheManager
 }
 
 // NewClient cria um novo cliente para APIs de loterias
 func NewClient() *Client {
 	client := resty.New()
-	client.SetTimeout(30 * time.Second)
+	client.SetTimeout(60 * time.Second) // Aumentado para 60 segundos
 	client.SetRetryCount(3)
 	client.SetRetryWaitTime(2 * time.Second)
 	
@@ -39,13 +40,48 @@ func NewClient() *Client {
 	})
 	
 	return &Client{
-		client:  client,
-		baseURL: config.GlobalConfig.App.DataSourceURL,
+		client:       client,
+		baseURL:      config.GlobalConfig.App.DataSourceURL,
+		cacheManager: NewCacheManager(),
 	}
 }
 
-// GetLatestDraws busca os últimos sorteios de uma loteria
+// GetLatestDraws busca os últimos sorteios de uma loteria com sistema de cache
 func (c *Client) GetLatestDraws(ltype lottery.LotteryType, count int) ([]lottery.Draw, error) {
+	// Tentar buscar da API primeiro
+	draws, err := c.fetchFromAPI(ltype, count)
+	
+	if err == nil && len(draws) >= count/2 {
+		// API funcionou, salvar no cache
+		if cacheErr := c.cacheManager.SaveToCache(ltype, draws, count); cacheErr != nil {
+			if config.IsVerbose() {
+				fmt.Printf("⚠️  Erro ao salvar cache: %v\n", cacheErr)
+			}
+		}
+		return draws, nil
+	}
+	
+	// API falhou, tentar cache
+	if config.IsVerbose() {
+		fmt.Printf("⚠️  API falhou para %s: %v\n", ltype, err)
+		fmt.Printf("🔍 Verificando cache...\n")
+	}
+	
+	cachedDraws, hasCachedData := c.cacheManager.LoadFromCache(ltype, count)
+	
+	if hasCachedData {
+		cacheTime, _, _ := c.cacheManager.GetCacheInfo(ltype)
+		fmt.Printf("📋 Usando dados do cache para %s (salvos em %s)\n", 
+			ltype, cacheTime.Format("02/01/2006 15:04"))
+		return cachedDraws, nil
+	}
+	
+	// Sem API e sem cache válido
+	return nil, fmt.Errorf("API da CAIXA indisponível e cache não encontrado ou expirado")
+}
+
+// fetchFromAPI busca dados diretamente da API
+func (c *Client) fetchFromAPI(ltype lottery.LotteryType, count int) ([]lottery.Draw, error) {
 	endpoint := fmt.Sprintf("%s/%s/", c.baseURL, string(ltype))
 	
 	var draws []lottery.Draw
@@ -56,10 +92,16 @@ func (c *Client) GetLatestDraws(ltype lottery.LotteryType, count int) ([]lottery
 	// Buscar o último sorteio primeiro para descobrir o número atual
 	latestResp, err := c.client.R().Get(endpoint)
 	
-	if err != nil || latestResp.StatusCode() != 200 {
-		fmt.Printf("⚠️  API da CAIXA inacessível (erro %d), usando dados simulados para %s\n", 
-			latestResp.StatusCode(), ltype)
-		return GetMockDraws(ltype, count), nil
+	if err != nil {
+		return nil, fmt.Errorf("erro de conectividade: %w", err)
+	}
+	
+	if latestResp.StatusCode() == 403 {
+		return nil, fmt.Errorf("API da CAIXA bloqueada (erro 403)")
+	}
+	
+	if latestResp.StatusCode() != 200 {
+		return nil, fmt.Errorf("API retornou status %d", latestResp.StatusCode())
 	}
 	
 	// Debug: Log da resposta
@@ -70,8 +112,7 @@ func (c *Client) GetLatestDraws(ltype lottery.LotteryType, count int) ([]lottery
 	
 	var latest lottery.Draw
 	if err := json.Unmarshal(latestResp.Body(), &latest); err != nil {
-		fmt.Printf("⚠️  Erro ao decodificar dados da API, usando dados simulados para %s\n", ltype)
-		return GetMockDraws(ltype, count), nil
+		return nil, fmt.Errorf("erro ao decodificar resposta da API: %w", err)
 	}
 	
 	draws = append(draws, latest)
@@ -102,13 +143,6 @@ func (c *Client) GetLatestDraws(ltype lottery.LotteryType, count int) ([]lottery
 		draws = append(draws, draw)
 	}
 	
-	// Se conseguimos poucos dados da API, complementar com mock
-	if len(draws) < count/2 {
-		fmt.Printf("⚠️  Poucos dados obtidos da API (%d/%d), complementando com dados simulados\n", len(draws), count)
-		mockDraws := GetMockDraws(ltype, count-len(draws))
-		draws = append(draws, mockDraws...)
-	}
-	
 	return draws, nil
 }
 
@@ -129,6 +163,10 @@ func (c *Client) GetDrawByNumber(ltype lottery.LotteryType, number int) (*lotter
 	
 	if err != nil {
 		return nil, fmt.Errorf("erro ao buscar sorteio %d: %w", number, err)
+	}
+	
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("API retornou status %d para sorteio %d", resp.StatusCode(), number)
 	}
 	
 	var draw lottery.Draw
@@ -183,48 +221,50 @@ func (c *Client) TestConnection() error {
 	resp, err := c.client.R().Get(fmt.Sprintf("%s/megasena/", c.baseURL))
 	
 	if err != nil {
-		return fmt.Errorf("erro de conectividade: %w - usando dados simulados", err)
+		return fmt.Errorf("erro de conectividade: %w", err)
 	}
 	
 	if resp.StatusCode() == 403 {
-		return fmt.Errorf("API da CAIXA bloqueada (403) - usando dados simulados para funcionamento")
+		return fmt.Errorf("API da CAIXA bloqueada (403)")
 	}
 	
 	if resp.StatusCode() != 200 {
-		return fmt.Errorf("API retornou status %d - usando dados simulados", resp.StatusCode())
+		return fmt.Errorf("API retornou status %d", resp.StatusCode())
 	}
 	
 	return nil
 }
 
 // GetNextDrawInfo busca informações sobre o próximo sorteio
-func (c *Client) GetNextDrawInfo(ltype lottery.LotteryType) (*time.Time, int, error) {
-	latest, err := c.GetLatestDraws(ltype, 1)
+func (c *Client) GetNextDrawInfo(ltype lottery.LotteryType) (time.Time, int, error) {
+	draws, err := c.GetLatestDraws(ltype, 1)
 	if err != nil {
-		return nil, 0, err
+		return time.Time{}, 0, err
 	}
 	
-	if len(latest) == 0 {
-		return nil, 0, fmt.Errorf("nenhum sorteio encontrado")
+	if len(draws) == 0 {
+		return time.Time{}, 0, fmt.Errorf("nenhum sorteio encontrado")
 	}
 	
-	nextDate := latest[0].NextDrawDate.Time()
-	return &nextDate, latest[0].NextDrawNumber, nil
+	latest := draws[0]
+	return time.Time(latest.NextDrawDate), latest.NextDrawNumber, nil
 }
 
-// TestDirectAPI testa resposta bruta da API
+// TestDirectAPI testa diretamente a API para debug
 func (c *Client) TestDirectAPI() (string, error) {
-	resp, err := c.client.R().
-		SetHeader("Accept", "application/json").
-		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
-		Get("https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/")
+	resp, err := c.client.R().Get(fmt.Sprintf("%s/megasena/", c.baseURL))
 	
 	if err != nil {
-		return "", fmt.Errorf("erro na requisição: %w", err)
+		return "", fmt.Errorf("erro de conectividade: %w", err)
 	}
 	
 	return fmt.Sprintf("Status: %d, Content-Type: %s, Body: %s", 
 		resp.StatusCode(), 
-		resp.Header().Get("Content-Type"),
-		string(resp.Body()[:min(500, len(resp.Body()))])), nil
+		resp.Header().Get("Content-Type"), 
+		string(resp.Body())), nil
+}
+
+// CleanCache limpa caches antigos
+func (c *Client) CleanCache() error {
+	return c.cacheManager.CleanOldCache()
 } 
